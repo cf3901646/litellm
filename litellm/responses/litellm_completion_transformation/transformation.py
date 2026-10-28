@@ -2417,10 +2417,14 @@ class LiteLLMCompletionResponsesConfig:
                 return [single_media]
             # Some adapters represent tool output as a list of "input_*" parts
             if isinstance(output, list):
+                if not output:
+                    return ""
                 normalized_blocks: Final[list[ToolMessageContentPart]] = []
                 text_acc: Final[list[str]] = []
+                has_non_text_part = False
                 for part in output:
                     if not isinstance(part, dict):
+                        has_non_text_part = True
                         continue
                     part_type = part.get("type")
                     if part_type in ("input_text", "output_text", "text"):
@@ -2430,9 +2434,14 @@ class LiteLLMCompletionResponsesConfig:
                             normalized_blocks.append({"type": "text", "text": txt})
                     elif (media := _decode_responses_media(part)) is not None:
                         normalized_blocks.append(media)
+                        has_non_text_part = True
+                    else:
+                        has_non_text_part = True
 
                 if any(b.get("type") != "text" for b in normalized_blocks):
                     return normalized_blocks
+                if not has_non_text_part:
+                    return "".join(text_acc)
                 if text_acc:
                     return "".join(text_acc)
                 try:

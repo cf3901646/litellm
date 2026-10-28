@@ -97,6 +97,10 @@ def test_media_normalization_preserves_formats_references_and_metadata(kind: str
     ("output", "expected"),
     [
         (None, ""),
+        ([], ""),
+        ([{"type": "input_text", "text": ""}], ""),
+        ([{"type": "output_text", "text": ""}], ""),
+        ([{"type": "text", "text": ""}], ""),
         ('{"ok":true}', '{"ok":true}'),
         ([{"type": "input_text", "text": "hello"}, {"type": "input_text", "text": " world"}], "hello world"),
         ({"type": "file", "status": "ready"}, '{"type": "file", "status": "ready"}'),
