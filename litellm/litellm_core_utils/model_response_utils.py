@@ -5,9 +5,8 @@ Utility functions for ModelResponse and ModelResponseStream objects.
 from collections.abc import Mapping
 from typing import Final
 
-from typing_extensions import ReadOnly, TypedDict
-
 from litellm.types.utils import Delta, ModelResponseBase, ModelResponseStream, StreamingChoices
+from typing_extensions import ReadOnly, TypedDict
 
 
 class _AttributeView(TypedDict):
@@ -144,7 +143,7 @@ def _is_choice_non_empty(choice: StreamingChoices) -> bool:
     # Check model_extra for dynamically added fields on the choice
     choice_extra_fields: Final[Mapping[str, object]] = choice.model_extra or {}
     for extra_field_name, extra_field_value in choice_extra_fields.items():
-        if extra_field_name == "index" and extra_field_value == 0:
+        if extra_field_name == "index":
             continue
         if extra_field_name in {"finish_reason", "logprobs"} and extra_field_value is None:
             continue
@@ -157,17 +156,9 @@ def _is_choice_non_empty(choice: StreamingChoices) -> bool:
     for attr_name in dir(choice):
         # Skip private attributes, methods, and known empty fields
         if (
-            attr_name.startswith("_")
+            attr_name.startswith(("_", "model_"))
             or callable(_attribute_of(choice, attr_name))
-            or attr_name.startswith("model_")
-            or attr_name
-            in {
-                "finish_reason",
-                "index",
-                "delta",
-                "logprobs",
-                "enhancements",
-            }
+            or attr_name in {"finish_reason", "index", "delta", "logprobs", "enhancements"}
         ):
             continue
 
@@ -190,14 +181,16 @@ def _is_delta_non_empty(delta: Delta) -> bool:
     """
     # Check model_extra for dynamically added fields (this is where Pydantic stores them)
     delta_extra_fields: Final[Mapping[str, object]] = delta.model_extra or {}
-    for extra_field_value in delta_extra_fields.values():
+    for extra_field_name, extra_field_value in delta_extra_fields.items():
+        if extra_field_name == "role":
+            continue
         if _has_meaningful_content(extra_field_value):
             return True
 
     # Check all regular attributes of the delta object
     for attr_name in dir(delta):
         # Skip private attributes, methods, and Pydantic-specific fields
-        if attr_name.startswith("_") or callable(_attribute_of(delta, attr_name)) or attr_name.startswith("model_"):
+        if attr_name.startswith(("_", "model_")) or callable(_attribute_of(delta, attr_name)) or attr_name == "role":
             continue
 
         delta_attr_value: object = getattr(delta, attr_name, None)

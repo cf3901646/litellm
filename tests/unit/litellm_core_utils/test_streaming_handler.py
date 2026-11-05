@@ -3037,6 +3037,78 @@ async def test_openrouter_streaming_cost_after_finish_reason(logging_obj: Loggin
 
 
 @pytest.mark.asyncio
+async def test_openrouter_streaming_post_finish_empty_choice_suppressed(logging_obj: Logging):
+    """
+    Regression (#50156): OpenRouter streaming emits an accounting trailer chunk
+    containing both an empty assistant choice and usage after finish_reason='stop'.
+    Verify that the intermediate semantically empty choice without usage is suppressed,
+    while final usage and cost are preserved.
+    """
+    from litellm.utils import ModelResponseListIterator
+
+    chunk1 = ModelResponseStream(
+        id="chatcmpl-or",
+        created=1742056047,
+        model="openrouter/openai/gpt-4.1-mini",
+        choices=[
+            StreamingChoices(
+                finish_reason=None, index=0, delta=Delta(content="OK", role="assistant")
+            )
+        ],
+        usage=None,
+    )
+    chunk2 = ModelResponseStream(
+        id="chatcmpl-or",
+        created=1742056048,
+        model="openrouter/openai/gpt-4.1-mini",
+        choices=[
+            StreamingChoices(finish_reason="stop", index=0, delta=Delta(content=""))
+        ],
+        usage=None,
+    )
+    chunk3_usage = Usage(
+        completion_tokens=2, prompt_tokens=14, total_tokens=16, cost=0.0000088
+    )
+    chunk3 = ModelResponseStream(
+        id="chatcmpl-or",
+        created=1742056049,
+        model="openrouter/openai/gpt-4.1-mini",
+        choices=[
+            StreamingChoices(
+                finish_reason=None, index=0, delta=Delta(content="", role="assistant")
+            )
+        ],
+        usage=chunk3_usage,
+    )
+
+    completion_stream = ModelResponseListIterator(
+        model_responses=[chunk1, chunk2, chunk3]
+    )
+    response = CustomStreamWrapper(
+        completion_stream=completion_stream,
+        model="openrouter/openai/gpt-4.1-mini",
+        custom_llm_provider="openrouter",
+        logging_obj=logging_obj,
+        stream_options={"include_usage": True},
+    )
+
+    collected_chunks = []
+    async for chunk in response:
+        collected_chunks.append(chunk)
+
+    # Exactly 3 chunks: content chunk ('OK'), stop chunk, and final usage chunk
+    # No intermediate empty choice chunk should be emitted
+    assert len(collected_chunks) == 3
+    assert collected_chunks[0].choices[0].delta.content == "OK"
+    assert collected_chunks[1].choices[0].finish_reason == "stop"
+
+    usage_chunks = [c for c in collected_chunks if hasattr(c, "usage") and c.usage]
+    assert len(usage_chunks) == 1
+    assert usage_chunks[0].usage.total_tokens == 16
+    assert usage_chunks[0].usage.cost == 0.0000088
+
+
+@pytest.mark.asyncio
 async def test_openrouter_streaming_usage_only_chunk_without_stream_options():
     """
     Regression: OpenRouter's post-finish chunk has `choices: []`. When the caller did not
