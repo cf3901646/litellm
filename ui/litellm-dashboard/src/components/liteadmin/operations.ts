@@ -131,7 +131,7 @@ export function createLiteAdminOperations(context: OperationContext) {
             mode === "read"
               ? undefined
               : {
-                  id: crypto.randomUUID(),
+                  id: uuid(),
                   name,
                   title,
                   arguments: {

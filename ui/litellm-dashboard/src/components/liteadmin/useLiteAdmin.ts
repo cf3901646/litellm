@@ -103,7 +103,7 @@ export function useLiteAdmin(session: LiteAdminSession) {
     if (active.current || !text.trim()) return;
     const turn: ActiveTurn = { controller: new AbortController(), outcome: "none" };
     active.current = turn;
-    const message: ChatMessage = { id: crypto.randomUUID(), role: "user", content: text.trim(), timestamp: Date.now() };
+    const message: ChatMessage = { id: uuid(), role: "user", content: text.trim(), timestamp: Date.now() };
     const history = entries.flatMap<Pick<ChatMessage, "role" | "content">>((entry) => {
       if (entry.kind === "message") return [entry.message];
       if (entry.kind !== "action" || entry.status === "review" || entry.status === "applying") return [];
@@ -129,7 +129,7 @@ export function useLiteAdmin(session: LiteAdminSession) {
         assertCurrent,
         onMessage: (content) => {
           assertCurrent();
-          const reply: ChatMessage = { id: crypto.randomUUID(), role: "assistant", content, timestamp: Date.now() };
+          const reply: ChatMessage = { id: uuid(), role: "assistant", content, timestamp: Date.now() };
           setEntries((current) => [...current, { kind: "message", id: reply.id, message: reply }]);
         },
         confirm: (action) =>
@@ -161,7 +161,7 @@ export function useLiteAdmin(session: LiteAdminSession) {
         const context = turn.outcome === "completed" ? "Completed changes are shown above. " : "";
         setEntries((current) => [
           ...current,
-          { kind: "error", id: crypto.randomUUID(), text: context + extractProxyErrorMessage(error) },
+          { kind: "error", id: uuid(), text: context + extractProxyErrorMessage(error) },
         ]);
       }
     } finally {
